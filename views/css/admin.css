@@ -1,0 +1,9 @@
+/* JosraResetShop: solo lo imprescindible, el resto es la interfaz nativa */
+#jrs .jrs-section { margin-bottom: 12px; }
+#jrs .jrs-section .help-block { margin: 2px 0 0 20px; }
+#jrs .jrs-mod { margin-bottom: 8px; }
+#jrs .jrs-mod summary { cursor: pointer; padding: 6px 0; }
+#jrs .jrs-log { max-height: 360px; overflow: auto; white-space: pre-wrap; font-size: 12px; }
+#jrs .jrs-ok { color: #2e7d32; }
+#jrs .jrs-err { color: #c62828; font-weight: bold; }
+#jrs .jrs-warn { color: #b26a00; }
