@@ -19,69 +19,111 @@
     var $ = function (sel, ctx) { return (ctx || root).querySelector(sel); };
     var $$ = function (sel, ctx) { return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); };
     var chks = $$('.jrs-chk');
-    var forced = {}; // sección -> [secciones que la obligan]
-    var userOn = {};  // lo que marcó la persona
+    var userOn = {};
     var running = false;
     var fullLog = [];
     var errors = 0;
 
+    function mode() { var r = $('input[name="jrs_mode"]:checked'); return r ? r.value : 'sections'; }
+    function demo() { var r = $('#jrs_demo_on'); return !!(r && r.checked); }
     function byKey(k) { return $('.jrs-chk[value="' + k + '"]'); }
     function labelOf(k) { var c = byKey(k); return c ? c.getAttribute('data-label') : k; }
+    function card(c) { return c.closest('.jrs-card'); }
 
-    // dependencias: si una marcada necesita otra, la otra se marca sola, bloqueada y con el motivo
+    // ------------------------------------------------------------------
+    // Marcar secciones (dependencias, modo «de fábrica»)
+    // ------------------------------------------------------------------
+
     function applyDeps() {
-      forced = {};
-      var changed = true;
+      var factory = mode() === 'factory';
       var on = {};
-      chks.forEach(function (c) { if (userOn[c.value]) { on[c.value] = true; } });
-      while (changed) {
+      var forced = {};
+      chks.forEach(function (c) {
+        if (factory) {
+          if (c.getAttribute('data-group') === 'data') { on[c.value] = true; }
+        } else if (userOn[c.value]) {
+          on[c.value] = true;
+        }
+      });
+      var changed = true;
+      while (changed && !factory) {
         changed = false;
         Object.keys(on).forEach(function (k) {
           var c = byKey(k);
-          var req = c ? (c.getAttribute('data-requires') || '') : '';
-          req.split(',').filter(Boolean).forEach(function (need) {
-            (forced[need] = forced[need] || []);
+          (c ? (c.getAttribute('data-requires') || '') : '').split(',').filter(Boolean).forEach(function (need) {
+            forced[need] = forced[need] || [];
             if (forced[need].indexOf(k) === -1) { forced[need].push(k); }
             if (!on[need]) { on[need] = true; changed = true; }
           });
         });
       }
       chks.forEach(function (c) {
-        var why = c.closest('.jrs-section').querySelector('.jrs-why');
+        var el = card(c);
+        var why = el.querySelector('.jrs-why');
         var f = forced[c.value];
+        var locked = factory ? c.getAttribute('data-group') === 'data' : !!(f && f.length);
         c.checked = !!on[c.value];
-        c.disabled = running || !!(f && f.length);
-        if (why) {
-          if (f && f.length) {
-            why.textContent = (txt.requiredBy || '%s').replace('%s', f.map(labelOf).join(', '));
-            why.hidden = false;
-          } else {
-            why.hidden = true;
-          }
+        c.disabled = running || locked || (factory && c.getAttribute('data-group') !== 'data');
+        el.classList.toggle('is-on', c.checked);
+        el.classList.toggle('is-locked', c.disabled);
+        el.style.display = factory && c.getAttribute('data-group') !== 'data' ? 'none' : '';
+        if (factory) {
+          why.textContent = txt.lockedFactory || '';
+          why.hidden = false;
+        } else if (f && f.length) {
+          why.textContent = (txt.requiredBy || '%s').replace('%s', f.map(labelOf).join(', '));
+          why.hidden = false;
+        } else {
+          why.hidden = true;
         }
       });
+      $$('.jrs-mode').forEach(function (m) { m.classList.toggle('is-on', !!m.querySelector('input:checked')); });
+      $('#jrs-factory').hidden = !factory;
+      $('[data-jrs-all]').style.visibility = factory ? 'hidden' : '';
+      $('[data-jrs-none]').style.visibility = factory ? 'hidden' : '';
+      $('#jrs-go-txt').textContent = factory ? (txt.factoryLabel || '') : (root.getAttribute('data-go') || $('#jrs-go-txt').getAttribute('data-def') || $('#jrs-go-txt').textContent);
+      moduleBadges();
       summary();
     }
 
+    function moduleBadges() {
+      $$('.jrs-mod').forEach(function (d) {
+        var n = $$('.jrs-tbl', d).filter(function (c) { return c.checked; }).length;
+        var b = d.querySelector('.jrs-mod-sel');
+        b.hidden = !n;
+        b.textContent = n ? '✓ ' + n : '';
+        var all = d.querySelector('.jrs-tbl-all');
+        if (all) { all.checked = n > 0 && n === $$('.jrs-tbl', d).length; }
+      });
+    }
+
     function selection() {
+      var sections = chks.filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+      if (mode() === 'factory') { sections.unshift('factory'); }
       return {
-        sections: chks.filter(function (c) { return c.checked; }).map(function (c) { return c.value; }),
+        sections: sections,
         tables: $$('.jrs-tbl').filter(function (c) { return c.checked; }).map(function (c) { return c.value; }),
-        modules: $$('.jrs-psmod').filter(function (c) { return c.checked; }).map(function (c) { return c.value; })
+        modules: $$('.jrs-psmod').filter(function (c) { return c.checked; }).map(function (c) { return c.value; }),
+        demo: mode() === 'factory' && demo() ? '1' : '0'
       };
     }
 
     function summary() {
       var s = selection();
       var box = $('#jrs-summary');
-      var parts = s.sections.map(labelOf);
+      var parts;
+      if (mode() === 'factory') {
+        parts = [(txt.factoryLabel || '') + (demo() ? ' (' + (txt.demoYes || '') + ')' : '')];
+      } else {
+        parts = s.sections.map(labelOf);
+      }
       if (s.tables.length) { parts.push(s.tables.length + ' ' + (txt.tables || '')); }
       if (s.modules.length) { parts.push(s.modules.length + ' ' + (txt.uninstall || '')); }
       if (!parts.length) {
         box.className = 'alert alert-info';
         box.textContent = txt.nothing || '';
       } else {
-        box.className = 'alert alert-warning';
+        box.className = 'alert ' + (mode() === 'factory' ? 'alert-danger' : 'alert-warning');
         box.innerHTML = '';
         var strong = document.createElement('strong');
         strong.textContent = (txt.willDelete || '') + ' ';
@@ -97,29 +139,37 @@
       $('#jrs-go').disabled = running || !any || $('#jrs-confirm').value.trim() !== 'BORRAR';
     }
 
+    $('#jrs-go-txt').setAttribute('data-def', $('#jrs-go-txt').textContent);
     chks.forEach(function (c) {
-      c.addEventListener('change', function () {
-        userOn[c.value] = c.checked;
-        applyDeps();
-      });
+      c.addEventListener('change', function () { userOn[c.value] = c.checked; applyDeps(); });
     });
+    $$('input[name="jrs_mode"], input[name="jrs_demo"]').forEach(function (r) { r.addEventListener('change', applyDeps); });
     root.addEventListener('change', function (e) {
-      if (e.target.classList.contains('jrs-tbl') || e.target.classList.contains('jrs-psmod')) { summary(); }
+      var t = e.target;
+      if (t.classList.contains('jrs-tbl-all')) {
+        $$('.jrs-tbl', t.closest('.jrs-mod')).forEach(function (c) { c.checked = t.checked; });
+      }
+      if (t.classList.contains('jrs-tbl') || t.classList.contains('jrs-tbl-all') || t.classList.contains('jrs-psmod')) {
+        moduleBadges();
+        summary();
+      }
     });
     $('#jrs-confirm').addEventListener('input', updateGo);
-    $('[data-jrs-all]').addEventListener('click', function () {
-      chks.forEach(function (c) { if (c.value !== 'thumbs') { userOn[c.value] = true; } });
+    $('[data-jrs-all]').addEventListener('click', function (e) {
+      e.preventDefault();
+      chks.forEach(function (c) { if (c.getAttribute('data-group') === 'data') { userOn[c.value] = true; } });
       applyDeps();
     });
-    $('[data-jrs-none]').addEventListener('click', function () {
+    $('[data-jrs-none]').addEventListener('click', function (e) {
+      e.preventDefault();
       userOn = {};
       $$('.jrs-tbl').forEach(function (c) { c.checked = false; });
       applyDeps();
     });
 
-    // -------------------------------------------------------------------
+    // ------------------------------------------------------------------
     // Ejecución
-    // -------------------------------------------------------------------
+    // ------------------------------------------------------------------
 
     function post(action, data) {
       var body = new URLSearchParams();
@@ -154,11 +204,18 @@
       box.scrollTop = box.scrollHeight;
     }
 
+    function stepIcon(li, state) {
+      var icons = { wait: 'radio_button_unchecked', run: 'autorenew', ok: 'check_circle', err: 'error' };
+      li.className = 'is-' + state;
+      li.querySelector('.material-icons').textContent = icons[state];
+    }
+
     function progress(i, total, label) {
       var pct = total ? Math.round(i * 100 / total) : 0;
       $('#jrs-bar').style.width = pct + '%';
       $('#jrs-pct').textContent = pct + '%';
       $('#jrs-now').textContent = label;
+      $('#jrs-count').textContent = total ? (txt.stepsDone || '%1$d / %2$d').replace('%1$d', i).replace('%2$d', total) : '';
     }
 
     function setRunning(on) {
@@ -178,19 +235,26 @@
       done.className = 'alert ' + (stoppedMsg ? 'alert-danger' : (errors ? 'alert-warning' : 'alert-success'));
       done.textContent = (stoppedMsg ? stoppedMsg : (errors ? (txt.finishedErr || '').replace('%d', errors) : txt.finishedOk || '')) + ' ' + (txt.reload || '');
       bar.classList.add(stoppedMsg ? 'progress-bar-danger' : (errors ? 'progress-bar-warning' : 'progress-bar-success'));
-      if (!stoppedMsg) { progress(steps.length, steps.length, done.textContent); }
+      if (!stoppedMsg) { progress(steps.length, steps.length, txt.finished || '✓'); } else { $('#jrs-now').textContent = '✗'; }
       $('#jrs-dl').hidden = false;
-      var stamp = new Date().toLocaleString();
-      log('— ' + stamp);
+      log('— ' + new Date().toLocaleString());
     }
+
+    // una línea por sección: se marca cuando acaba su último paso
+    function groupLi(step) { return $('#jrs-steps').querySelector('li[data-g="' + groupIdx[step.group] + '"]'); }
+    var groupIdx = {};
+    var groupLast = {};
 
     function runSteps(steps, i, state, tries) {
       if (i >= steps.length) { finish(steps); return; }
       var step = steps[i];
-      progress(i, steps.length, step.label);
+      var li = groupLi(step);
+      if (!li.classList.contains('is-err')) { stepIcon(li, 'run'); }
+      progress(i, steps.length, step.group === step.label ? step.label : step.group + ' · ' + step.label);
       post('Step', { step: step.id, state: JSON.stringify(state || {}) }).then(function (r) {
         if (!r || !r.ok) {
           errors++;
+          stepIcon(li, 'err');
           log('✗ ' + step.label + ': ' + ((r && r.error) || '?'), 'jrs-err');
           finish(steps, (r && r.error) || txt.stopped);
           return;
@@ -199,35 +263,42 @@
         (r.errors || []).forEach(function (l) { errors++; log(l, 'jrs-err'); });
         if (!r.done) {
           runSteps(steps, i, r.state, 0);
-        } else {
-          runSteps(steps, i + 1, {}, 0);
+          return;
         }
+        if ((r.errors || []).length) { stepIcon(li, 'err'); } else if (groupLast[step.group] === i && !li.classList.contains('is-err')) { stepIcon(li, 'ok'); }
+        // si falta lo imprescindible para «de fábrica», no se sigue borrando
+        if ((r.errors || []).length && step.id === 'factory.installer') {
+          finish(steps, r.errors[0]);
+          return;
+        }
+        runSteps(steps, i + 1, {}, 0);
       }).catch(function (err) {
-        // un corte de red: se reintenta el mismo paso un par de veces (lo borrado no se repite)
         if (tries < 2) {
           log('… ' + err.message + ' — reintentando', 'jrs-warn');
           setTimeout(function () { runSteps(steps, i, state, tries + 1); }, 3000);
           return;
         }
         errors++;
+        stepIcon(li, 'err');
         log('✗ ' + step.label + ': ' + err.message, 'jrs-err');
         finish(steps, txt.stopped);
       });
     }
 
     $('#jrs-go').addEventListener('click', function () {
-      if (running || !window.confirm(txt.confirmJs || '?')) { return; }
+      var factory = mode() === 'factory';
+      if (running || !window.confirm((factory ? txt.confirmFactory : txt.confirmJs) || '?')) { return; }
       var s = selection();
       fullLog = [];
       errors = 0;
       $('#jrs-log').innerHTML = '';
+      $('#jrs-steps').innerHTML = '';
       $('#jrs-done').hidden = true;
       $('#jrs-dl').hidden = true;
-      var bar = $('#jrs-bar');
-      bar.className = 'progress-bar progress-bar-striped active';
+      $('#jrs-bar').className = 'progress-bar progress-bar-striped active';
       $('#jrs-progress').hidden = false;
       setRunning(true);
-      progress(0, 1, txt.planning || '');
+      progress(0, 0, txt.planning || '');
       $('#jrs-progress').scrollIntoView({ behavior: 'smooth', block: 'start' });
       post('Plan', s).then(function (r) {
         if (!r || !r.ok) {
@@ -237,6 +308,21 @@
           return;
         }
         log('JosraResetShop · ' + new Date().toLocaleString());
+        groupIdx = {};
+        groupLast = {};
+        r.steps.forEach(function (st, n) {
+          groupLast[st.group] = n;
+          if (groupIdx[st.group] !== undefined) { return; }
+          groupIdx[st.group] = Object.keys(groupIdx).length;
+          var li = document.createElement('li');
+          li.setAttribute('data-g', groupIdx[st.group]);
+          var ico = document.createElement('i');
+          ico.className = 'material-icons';
+          li.appendChild(ico);
+          li.appendChild(document.createTextNode(st.group));
+          $('#jrs-steps').appendChild(li);
+          stepIcon(li, 'wait');
+        });
         runSteps(r.steps, 0, {}, 0);
       }).catch(function (err) {
         log('✗ ' + err.message, 'jrs-err');
@@ -255,6 +341,7 @@
       setTimeout(function () { URL.revokeObjectURL(a.href); a.parentNode.removeChild(a); }, 500);
     });
 
+    chks.forEach(function (c) { if (c.closest('.jrs-card').querySelector('.jrs-card__num') && c.closest('.jrs-card').querySelector('.jrs-card__num').textContent.trim() === '0') { c.closest('.jrs-card').classList.add('is-empty'); } });
     applyDeps();
   });
 }());

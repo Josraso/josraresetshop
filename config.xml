@@ -2,7 +2,7 @@
 <module>
     <name>josraresetshop</name>
     <displayName><![CDATA[JosraResetShop - Vaciar tienda]]></displayName>
-    <version><![CDATA[1.1.0]]></version>
+    <version><![CDATA[1.2.0]]></version>
     <description><![CDATA[Vacía la tienda por secciones: pedidos, clientes, catálogo, categorías, imágenes, estadísticas y más.]]></description>
     <author><![CDATA[josra]]></author>
     <tab><![CDATA[administration]]></tab>

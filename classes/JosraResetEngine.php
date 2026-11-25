@@ -24,12 +24,13 @@ class JosraResetEngine
 
     /** Orden fijo en el que se ejecutan las secciones */
     private static $order = [
-        'orders', 'customers', 'carts', 'messages', 'cart_rules', 'catalog', 'categories',
+        'factory', 'orders', 'customers', 'carts', 'messages', 'cart_rules', 'catalog', 'categories',
         'attributes', 'manufacturers', 'employees', 'stats', 'thumbs',
     ];
 
     /** Secciones que obligan a marcar otras (y por qué) */
     private static $requires = [
+        'factory' => ['orders', 'customers', 'carts', 'messages', 'cart_rules', 'catalog', 'categories', 'attributes', 'manufacturers', 'employees', 'stats'],
         'customers' => ['orders', 'carts'],
         'catalog' => ['carts'],
         'categories' => ['catalog'],
@@ -153,8 +154,10 @@ class JosraResetEngine
             ],
         ];
 
+        $icons = ['orders' => 'shopping_cart', 'customers' => 'people', 'carts' => 'remove_shopping_cart', 'messages' => 'forum', 'cart_rules' => 'local_offer', 'catalog' => 'inventory_2', 'categories' => 'account_tree', 'attributes' => 'tune', 'manufacturers' => 'factory', 'employees' => 'badge', 'stats' => 'insights', 'thumbs' => 'photo_size_select_large'];
         foreach ($list as $key => $info) {
             $list[$key]['key'] = $key;
+            $list[$key]['icon'] = isset($icons[$key]) ? $icons[$key] : 'delete';
             $list[$key]['requires'] = isset(self::$requires[$key]) ? self::$requires[$key] : [];
             $list[$key]['requires_str'] = implode(',', $list[$key]['requires']);
             $list[$key]['group'] = $key === 'thumbs' ? 'files' : 'data';
@@ -243,8 +246,11 @@ class JosraResetEngine
     /**
      * @return array ['sections' => [...], 'steps' => [['id' => ..., 'label' => ...]], 'added' => [...]]
      */
-    public function plan(array $sections, array $tables, array $psModules)
+    public function plan(array $sections, array $tables, array $psModules, $demo = false)
     {
+        if (in_array('factory', $sections, true) && !JosraResetFactory::supported()) {
+            throw new Exception('«Dejar como recién instalada» necesita PrestaShop ' . JosraResetFactory::MIN_VERSION . ' o superior.');
+        }
         $sections = array_values(array_intersect(self::$order, $sections));
         // dependencias (en cadena)
         $added = [];
@@ -264,9 +270,15 @@ class JosraResetEngine
         } while ($changed);
         $sections = array_values(array_intersect(self::$order, $sections));
 
+        $labels = [];
+        foreach ($this->getSectionsInfo() as $k => $info) {
+            $labels[$k] = $info['label'];
+        }
+        $labels['factory'] = 'Datos de instalación de PrestaShop ' . _PS_VERSION_;
         $steps = [];
         foreach ($sections as $s) {
             foreach ($this->stepsFor($s, $sections) as $step) {
+                $step['group'] = isset($labels[$s]) ? $labels[$s] : $s;
                 $steps[] = $step;
             }
         }
@@ -279,7 +291,7 @@ class JosraResetEngine
         }
         foreach ($tables as $t) {
             if (isset($valid[$t])) {
-                $steps[] = ['id' => 'modtable:' . $t, 'label' => 'Tabla ' . $t . ' (' . $valid[$t] . ')'];
+                $steps[] = ['id' => 'modtable:' . $t, 'label' => 'Tabla ' . $t . ' (' . $valid[$t] . ')', 'group' => 'Tablas de otros módulos'];
             }
         }
 
@@ -289,12 +301,44 @@ class JosraResetEngine
         }
         foreach ($psModules as $m) {
             if (isset($connected[$m])) {
-                $steps[] = ['id' => 'psmod:' . $m, 'label' => 'Desinstalar ' . $connected[$m] . ' (' . $m . ')'];
+                $steps[] = ['id' => 'psmod:' . $m, 'label' => 'Desinstalar ' . $connected[$m] . ' (' . $m . ')', 'group' => 'Módulos de PrestaShop / Addons'];
             }
+        }
+
+        $factory = in_array('factory', $sections, true);
+        if ($factory) {
+            $steps[] = ['id' => 'factory.config', 'label' => 'Configuración de fábrica'];
+            $steps[] = ['id' => 'factory.groups', 'label' => 'Grupos de clientes de fábrica'];
+            $steps[] = ['id' => 'factory.orderstates', 'label' => 'Estados de pedido de fábrica'];
+            $steps[] = ['id' => 'factory.carriers', 'label' => 'Transportistas de fábrica'];
+            $steps[] = ['id' => 'factory.cms', 'label' => 'Páginas CMS de fábrica'];
+            $steps[] = ['id' => 'factory.contacts', 'label' => 'Contactos de fábrica'];
+            $steps[] = ['id' => 'factory.meta', 'label' => 'Títulos y URLs de las páginas'];
+            $steps[] = ['id' => 'factory.misc', 'label' => 'Resto de datos de fábrica'];
+        }
+        // las tablas de módulos y los módulos conectados van antes de cargar la demostración
+        $tail = [];
+        foreach ($steps as $k => $st) {
+            if (strpos($st['id'], 'modtable:') === 0 || strpos($st['id'], 'psmod:') === 0) {
+                $tail[] = $st;
+                unset($steps[$k]);
+            }
+        }
+        $steps = array_merge(array_values($steps), $tail);
+        if ($factory) {
+            if ($demo) {
+                $steps[] = ['id' => 'factory.demo', 'label' => 'Productos de demostración'];
+            }
+            $steps[] = ['id' => 'factory.translate' . ($demo ? ':demo' : ''), 'label' => 'Traducir los textos de fábrica'];
         }
 
         if ($steps) {
             $steps[] = ['id' => 'finish' . (in_array('categories', $sections, true) ? ':tree' : ''), 'label' => 'Vaciar cachés'];
+        }
+        foreach ($steps as $k => $st) {
+            if (empty($st['group'])) {
+                $steps[$k]['group'] = $st['label'];
+            }
         }
 
         return ['sections' => $sections, 'steps' => $steps, 'added' => array_values(array_unique($added))];
@@ -329,6 +373,8 @@ class JosraResetEngine
             return $out;
         };
         switch ($section) {
+            case 'factory':
+                return [['id' => 'factory.installer', 'label' => 'Datos de instalación de PrestaShop ' . _PS_VERSION_]];
             case 'orders':
                 return array_merge(
                     [
@@ -466,6 +512,34 @@ class JosraResetEngine
                     break;
                 case 'finish':
                     $this->finish($arg === 'tree');
+                    break;
+                case 'factory.installer':
+                case 'factory.config':
+                case 'factory.groups':
+                case 'factory.orderstates':
+                case 'factory.carriers':
+                case 'factory.cms':
+                case 'factory.contacts':
+                case 'factory.meta':
+                case 'factory.misc':
+                case 'factory.demo':
+                case 'factory.translate':
+                    $factory = new JosraResetFactory();
+                    $methods = [
+                        'factory.installer' => 'stepInstaller', 'factory.config' => 'stepConfig', 'factory.groups' => 'stepGroups',
+                        'factory.orderstates' => 'stepOrderStates', 'factory.carriers' => 'stepCarriers', 'factory.cms' => 'stepCms',
+                        'factory.contacts' => 'stepContacts', 'factory.meta' => 'stepMeta', 'factory.misc' => 'stepMisc',
+                        'factory.demo' => 'stepDemo', 'factory.translate' => 'stepTranslate',
+                    ];
+                    try {
+                        if ($op === 'factory.translate') {
+                            $done = $factory->stepTranslate($state, $arg === 'demo');
+                        } else {
+                            $done = $factory->{$methods[$op]}($state);
+                        }
+                    } finally {
+                        $this->log = array_merge($this->log, $factory->log);
+                    }
                     break;
                 default:
                     $method = 'step' . str_replace(' ', '', ucwords(str_replace(['.', '_'], ' ', $op)));

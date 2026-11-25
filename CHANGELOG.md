@@ -1,5 +1,15 @@
 # Changelog — JosraResetShop
 
+## 1.2.0 — 2026-11-25
+- Nuevo modo «Dejar como recién instalada» (PrestaShop 1.7.8 o superior): borra todas las secciones y vuelve a poner lo que trae una instalación nueva de esa misma versión, con el propio instalador de PrestaShop.
+  - Vuelven de fábrica: la configuración de la tienda (los datos de dirección y teléfono quedan vacíos), transportistas, estados de pedido (se recrean los que falten, como cheque, transferencia o contra reembolso), grupos de clientes, páginas CMS, contactos, títulos y URLs de las páginas, tratamientos, estados de devolución, accesos rápidos y motivos de stock, ya traducidos al idioma de la tienda.
+  - Se vacían: tiendas físicas, mensajes predefinidos, claves del webservice, consultas SQL, alias de búsqueda y traducciones propias.
+  - Se conservan: tu empleado, perfiles y permisos, dominio, SSL, URL amigables, nombre y logos de la tienda, idiomas, países, impuestos, monedas, el tema y los módulos con su configuración (también sus transportistas y estados de pedido).
+  - Con un interruptor, los productos de demostración de la instalación (19 productos con sus imágenes, categorías, marcas, un cliente y pedidos de ejemplo).
+  - Los datos de instalación se bajan solos de GitHub la primera vez (unos 50 MB) mientras la pantalla va informando; si el servidor no sale a internet, se puede subir el zip de PrestaShop por FTP a var/josraresetshop/. Si no se pueden preparar, no se borra nada.
+- Pantalla nueva con componentes de PrestaShop: elección de modo, tarjetas por sección con la cifra real e icono (se marcan al tocarlas), lista de lo que se borra y lo que se conserva, tablas de módulos con «marcar todas» por módulo, y progreso por secciones con su registro al lado.
+- Al desinstalar el módulo se borran también los datos de instalación descargados.
+
 ## 1.1.0 — 2026-11-25
 - Las combinaciones ya no fallan al crear productos nuevos tras vaciar el catálogo en PrestaShop 8 y 9 (se vacía también `product_attribute_lang`).
 - «Carritos» borra solo los carritos sin pedido, como decía; los de los pedidos que se quedan no se tocan.

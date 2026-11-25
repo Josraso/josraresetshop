@@ -9,6 +9,7 @@ if (!defined('_PS_VERSION_')) {
 }
 
 require_once _PS_MODULE_DIR_ . 'josraresetshop/classes/JosraResetEngine.php';
+require_once _PS_MODULE_DIR_ . 'josraresetshop/classes/JosraResetFactory.php';
 
 class AdminJosraResetShopController extends ModuleAdminController
 {
@@ -34,11 +35,16 @@ class AdminJosraResetShopController extends ModuleAdminController
     {
         $this->guard();
         $engine = new JosraResetEngine();
-        $plan = $engine->plan(
-            $this->arrayParam('sections'),
-            $this->arrayParam('tables'),
-            $this->arrayParam('modules')
-        );
+        try {
+            $plan = $engine->plan(
+                $this->arrayParam('sections'),
+                $this->arrayParam('tables'),
+                $this->arrayParam('modules'),
+                (bool) Tools::getValue('demo')
+            );
+        } catch (Exception $e) {
+            $this->sendJson(['ok' => false, 'error' => $e->getMessage()]);
+        }
         if (!$plan['steps']) {
             $this->sendJson(['ok' => false, 'error' => 'No hay nada marcado que borrar.']);
         }
@@ -63,6 +69,16 @@ class AdminJosraResetShopController extends ModuleAdminController
         $result = $engine->run($step, $state);
         @flock($lock, LOCK_UN);
         @fclose($lock);
+
+        if (!empty($result['state']['start_download'])) {
+            // la descarga de PrestaShop puede tardar: se contesta ya y se sigue bajando (el navegador va preguntando)
+            unset($result['state']['start_download']);
+            $result['log'][] = '… Empieza la descarga de PrestaShop ' . _PS_VERSION_ . ' desde GitHub (unos 50 MB)';
+            $this->sendJson(['ok' => true] + $result, function () {
+                $factory = new JosraResetFactory();
+                $factory->download();
+            });
+        }
 
         $this->sendJson(['ok' => true] + $result);
     }
@@ -102,14 +118,34 @@ class AdminJosraResetShopController extends ModuleAdminController
         return is_array($v) ? array_values(array_map('strval', $v)) : [];
     }
 
-    private function sendJson(array $data)
+    /**
+     * @param callable|null $after trabajo que sigue después de contestar (si el servidor lo permite; si no, antes)
+     */
+    private function sendJson(array $data, $after = null)
     {
         while (ob_get_level() > 0) {
             @ob_end_clean();
         }
+        $body = json_encode($data);
+        if ($after && !function_exists('fastcgi_finish_request') && !function_exists('litespeed_finish_request')) {
+            // sin forma de contestar antes: se hace el trabajo y luego se contesta
+            call_user_func($after);
+            $after = null;
+        }
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
-        echo json_encode($data);
+        header('Content-Length: ' . strlen($body));
+        echo $body;
+        if ($after) {
+            @ignore_user_abort(true);
+            @flush();
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } else {
+                litespeed_finish_request();
+            }
+            call_user_func($after);
+        }
         exit;
     }
 }

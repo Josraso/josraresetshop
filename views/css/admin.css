@@ -1,9 +1,62 @@
-/* JosraResetShop: solo lo imprescindible, el resto es la interfaz nativa */
-#jrs .jrs-section { margin-bottom: 12px; }
-#jrs .jrs-section .help-block { margin: 2px 0 0 20px; }
-#jrs .jrs-mod { margin-bottom: 8px; }
-#jrs .jrs-mod summary { cursor: pointer; padding: 6px 0; }
-#jrs .jrs-log { max-height: 360px; overflow: auto; white-space: pre-wrap; font-size: 12px; }
+/* JosraResetShop: encima de los paneles y la rejilla nativos, solo el estado de las tarjetas y el registro */
+#jrs [hidden] { display: none !important; }
+#jrs .material-icons { vertical-align: middle; font-size: 18px; }
+
+/* modo */
+#jrs .jrs-mode { display: flex; gap: 14px; align-items: center; cursor: pointer; padding: 16px; margin-bottom: 15px; border: 2px solid transparent; transition: border-color .15s, box-shadow .15s; }
+#jrs .jrs-mode input { position: absolute; opacity: 0; pointer-events: none; }
+#jrs .jrs-mode__ico { flex: 0 0 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #e7f7fb; color: #25b9d7; }
+#jrs .jrs-mode__ico .material-icons { font-size: 26px; }
+#jrs .jrs-mode__ico--factory { background: #fdecea; color: #c62828; }
+#jrs .jrs-mode__txt strong { display: block; font-size: 15px; }
+#jrs .jrs-mode__txt small { color: #6c868e; }
+#jrs .jrs-mode.is-on { border-color: #25b9d7; box-shadow: 0 0 0 3px rgba(37, 185, 215, .15); }
+#jrs .jrs-mode.is-disabled { opacity: .55; cursor: not-allowed; }
+
+/* tarjetas de secciones */
+#jrs .jrs-intro { margin-top: 0; }
+#jrs .jrs-grid { display: flex; flex-wrap: wrap; }
+#jrs .jrs-grid > div { display: flex; }
+#jrs .jrs-card { position: relative; display: flex; flex-direction: column; width: 100%; cursor: pointer; padding: 14px; margin-bottom: 15px; border: 2px solid #e5e5e5; box-shadow: none; transition: border-color .15s, background .15s; font-weight: normal; }
+#jrs .jrs-card input { position: absolute; opacity: 0; pointer-events: none; }
+#jrs .jrs-card:hover { border-color: #bbcdd2; }
+#jrs .jrs-card__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+#jrs .jrs-card__ico { font-size: 26px !important; color: #6c868e; }
+#jrs .jrs-card__tick { font-size: 22px !important; color: #e5e5e5; }
+#jrs .jrs-card__title { font-weight: 600; font-size: 14px; line-height: 1.3; }
+#jrs .jrs-card__num { font-size: 26px; font-weight: 700; line-height: 1.2; margin-top: 6px; color: #363a41; }
+#jrs .jrs-card__num--small { font-size: 16px; }
+#jrs .jrs-card__unit { color: #6c868e; font-size: 12px; margin-bottom: 6px; }
+#jrs .jrs-card__desc { color: #6c868e; font-size: 12px; line-height: 1.4; flex: 1; }
+#jrs .jrs-card .jrs-why { margin-top: 8px; white-space: normal; display: inline-block; text-align: left; line-height: 1.3; }
+#jrs .jrs-card.is-on { border-color: #c62828; background: #fffafa; }
+#jrs .jrs-card.is-on .jrs-card__ico, #jrs .jrs-card.is-on .jrs-card__tick { color: #c62828; }
+#jrs .jrs-card.is-locked { cursor: default; }
+#jrs .jrs-card.is-empty .jrs-card__num { color: #bbcdd2; }
+
+/* de fábrica */
+#jrs .jrs-h4 { margin-top: 0; }
+#jrs .jrs-list { padding-left: 18px; }
+#jrs .jrs-list li { margin-bottom: 4px; }
+
+/* módulos */
+#jrs .jrs-mod { border-bottom: 1px solid #eee; }
+#jrs .jrs-mod summary { cursor: pointer; padding: 8px 0; list-style: none; }
+#jrs .jrs-mod summary::-webkit-details-marker { display: none; }
+#jrs .jrs-mod summary .material-icons { transition: transform .15s; }
+#jrs .jrs-mod[open] summary .material-icons { transform: rotate(90deg); }
+#jrs .jrs-mod .badge { margin-left: 4px; }
+#jrs .jrs-psmods li { margin: 6px 0; }
+
+/* confirmar y progreso */
+#jrs .jrs-go { border: 2px solid #c62828; }
+#jrs .jrs-go .alert { margin-bottom: 0; }
+#jrs .jrs-steps li { padding: 3px 0; color: #6c868e; }
+#jrs .jrs-steps li .material-icons { font-size: 16px; margin-right: 4px; }
+#jrs .jrs-steps li.is-run { color: #25b9d7; font-weight: 600; }
+#jrs .jrs-steps li.is-ok { color: #2e7d32; }
+#jrs .jrs-steps li.is-err { color: #c62828; font-weight: 600; }
+#jrs .jrs-log { max-height: 420px; overflow: auto; white-space: pre-wrap; font-size: 12px; }
 #jrs .jrs-ok { color: #2e7d32; }
 #jrs .jrs-err { color: #c62828; font-weight: bold; }
 #jrs .jrs-warn { color: #b26a00; }

@@ -11,6 +11,7 @@ if (!defined('_PS_VERSION_')) {
 
 require_once dirname(__FILE__) . '/classes/JosraresetshopUpdater.php';
 require_once dirname(__FILE__) . '/classes/JosraResetEngine.php';
+require_once dirname(__FILE__) . '/classes/JosraResetFactory.php';
 
 class JosraResetShop extends Module
 {
@@ -21,7 +22,7 @@ class JosraResetShop extends Module
     {
         $this->name = 'josraresetshop';
         $this->tab = 'administration';
-        $this->version = '1.1.0';
+        $this->version = '1.2.0';
         $this->author = 'josra';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -51,7 +52,13 @@ class JosraResetShop extends Module
         foreach (['TS', 'INFO', 'SU', 'LT'] as $k) {
             Configuration::deleteByName('JOSRARESETSHOP_UPD_' . $k);
         }
+        Configuration::deleteByName('JOSRARESETSHOP_INSTALLER_URL');
         $this->uninstallAjaxTab();
+        // datos de instalación de PrestaShop que se bajaron para «Dejar como recién instalada»
+        $dir = rtrim(_PS_ROOT_DIR_, '/\\') . '/var/josraresetshop/';
+        if (is_dir($dir)) {
+            Tools::deleteDirectory($dir, true);
+        }
 
         return parent::uninstall();
     }
@@ -136,11 +143,17 @@ class JosraResetShop extends Module
                 'tables' => $this->l('tablas de otros módulos'),
                 'uninstall' => $this->l('módulos a desinstalar'),
                 'planning' => $this->l('Preparando…'),
+                'finished' => $this->l('Terminado'),
                 'finishedOk' => $this->l('Vaciado terminado sin errores.'),
                 'finishedErr' => $this->l('Vaciado terminado con %d errores: están en rojo en el registro.'),
                 'stopped' => $this->l('Se ha parado por un error de conexión. Lo ya borrado, borrado está: vuelve a lanzarlo y seguirá con lo que falte.'),
                 'reload' => $this->l('Recarga la página para ver las cifras actualizadas.'),
                 'confirmJs' => $this->l('Última comprobación: ¿vaciar lo marcado? No se puede deshacer.'),
+                'confirmFactory' => $this->l('Última comprobación: ¿dejar la tienda como recién instalada? Se borra todo lo de la lista y no se puede deshacer.'),
+                'factoryLabel' => $this->l('Dejar como recién instalada'),
+                'demoYes' => $this->l('con productos de demostración'),
+                'lockedFactory' => $this->l('Incluida en «Dejar como recién instalada»'),
+                'stepsDone' => $this->l('%1$d de %2$d pasos'),
             ];
             $this->context->smarty->assign([
                 'jrs_txt' => json_encode($txt, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE),
@@ -154,6 +167,8 @@ class JosraResetShop extends Module
                 'jrs_ps_modules' => $psModules,
                 'jrs_employee' => $this->context->employee->firstname . ' ' . $this->context->employee->lastname,
                 'jrs_multishop' => Shop::isFeatureActive(),
+                'jrs_factory' => (new JosraResetFactory())->info(),
+                'jrs_min_factory' => JosraResetFactory::MIN_VERSION,
             ]);
             $forms = $this->display(__FILE__, 'views/templates/admin/configure.tpl');
         }
